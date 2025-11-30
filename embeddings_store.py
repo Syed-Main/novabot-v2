@@ -1,5 +1,5 @@
 """
-Embeddings store using local sentence-transformers (free, no API needed)
+Embeddings store using FastEmbed (Lightweight ONNX)
 """
 import json
 import pickle
@@ -7,16 +7,16 @@ import numpy as np
 from typing import List, Dict, Tuple
 import os
 
-# Use local embeddings by default
+# Use FastEmbed (Lightweight ONNX)
 try:
-    from sentence_transformers import SentenceTransformer
-    print("Loading local embedding model (all-MiniLM-L6-v2)...")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    from fastembed import TextEmbedding
+    print("Loading FastEmbed model (BGE-Small)...")
+    embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
     EMBEDDING_DIMENSION = 384
-    print("[OK] Local embeddings ready")
+    print("[OK] FastEmbed ready")
 except Exception as e:
     print(f"[FAIL] Failed to load embedding model: {e}")
-    print("Run: pip install sentence-transformers")
+    print("Run: pip install fastembed")
     raise
 
 
@@ -27,9 +27,10 @@ class EmbeddingsStore:
         self.dimension = EMBEDDING_DIMENSION
     
     def get_embedding(self, text: str) -> List[float]:
-        """Get embedding for a single text using local model"""
+        """Get embedding for a single text using FastEmbed"""
         try:
-            return embedding_model.encode(text).tolist()
+            # FastEmbed returns a generator of vectors
+            return list(embedding_model.embed([text]))[0].tolist()
         except Exception as e:
             print(f"Error getting embedding: {e}")
             return [0] * self.dimension
@@ -41,7 +42,10 @@ class EmbeddingsStore:
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             try:
-                embeddings = embedding_model.encode(batch, show_progress_bar=False).tolist()
+                # FastEmbed returns a generator, convert to list
+                embeddings = list(embedding_model.embed(batch))
+                # Convert numpy arrays to lists
+                embeddings = [e.tolist() for e in embeddings]
                 all_embeddings.extend(embeddings)
                 print(f"  Embedded {len(all_embeddings)}/{len(texts)} texts...")
             except Exception as e:
