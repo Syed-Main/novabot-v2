@@ -6,10 +6,16 @@ from bot_engine import StudentBot
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Initialize bot
-print("Initializing bot...")
-bot = StudentBot()
-print("Bot ready!")
+# Initialize bot lazily
+bot = None
+
+def get_bot():
+    global bot
+    if bot is None:
+        print("Initializing bot (lazy load)...")
+        bot = StudentBot()
+        print("Bot ready!")
+    return bot
 
 # Simple in-memory store for student info per session
 student_sessions = {}
@@ -56,10 +62,11 @@ def chat():
             })
         
         # Normal chat flow
-        response = bot.handle_message(student_phone, student_name, message)
+        current_bot = get_bot()
+        response = current_bot.handle_message(student_phone, student_name, message)
         
         # Check handoff
-        needs_handoff = bot.check_handoff_needed(message, response)
+        needs_handoff = current_bot.check_handoff_needed(message, response)
         
         return jsonify({
             'response': response,
